@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1f2a44">
+<title>원룸 관리</title>
+<style>
+  :root{
+    --bg:#eef0f3;
+    --surface:#ffffff;
+    --ink:#171a21;
+    --ink-soft:#646b78;
+    --line:#e2e5ea;
+    --brand:#1f2a44;
+    --brand-soft:#e9ecf4;
+    --paid:#1c8a4e;
+    --paid-soft:#e6f4ec;
+    --unpaid:#cf4634;
+    --unpaid-soft:#fbeae6;
+    --warn:#bd7a13;
+    --warn-soft:#fbf1de;
+    --vacant:#8a909c;
+    --vacant-soft:#eef0f3;
+    --radius:16px;
+    --shadow:0 1px 2px rgba(20,25,40,.05), 0 4px 16px rgba(20,25,40,.04);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Pretendard','Noto Sans KR',system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    font-feature-settings:"tnum";
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  input,select{font-family:inherit}
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* ---------- Lock ---------- */
+  #lockScreen{
+    position:fixed;inset:0;background:var(--brand);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:32px 24px;color:#fff;z-index:100;
+  }
+  #lockScreen h1{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-.02em}
+  #lockSub{font-size:14px;color:#aeb6cc;margin-bottom:40px;text-align:center;line-height:1.5}
+  .pinDots{display:flex;gap:16px;margin-bottom:36px;height:18px}
+  .pinDot{width:14px;height:14px;border-radius:50%;border:2px solid #67708f;transition:.15s}
+  .pinDot.on{background:#fff;border-color:#fff}
+  .pinDot.err{border-color:var(--unpaid);background:var(--unpaid)}
+  .keypad{display:grid;grid-template-columns:repeat(3,76px);gap:18px}
+  .key{
+    width:76px;height:76px;border-radius:50%;background:rgba(255,255,255,.08);
+    color:#fff;font-size:28px;font-weight:500;display:flex;align-items:center;justify-content:center;
+    transition:.1s;user-select:none;
+  }
+  .key:active{background:rgba(255,255,255,.22);transform:scale(.95)}
+  .key.fn{background:transparent;font-size:15px;color:#aeb6cc}
+  .key.fn:active{background:rgba(255,255,255,.08)}
+  #lockHint{margin-top:28px;font-size:13px;color:#aeb6cc;min-height:18px}
+
+  /* ---------- Layout ---------- */
+  #mainScreen{max-width:560px;margin:0 auto;padding-bottom:96px}
+  header.appbar{
+    position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;
+    padding:calc(env(safe-area-inset-top) + 14px) 18px 14px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  header.appbar .title{font-size:18px;font-weight:700;letter-spacing:-.02em}
+  .iconbtn{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff}
+  .iconbtn:active{background:rgba(255,255,255,.14)}
+  .iconbtn svg{width:22px;height:22px}
+
+  /* month + building bar */
+  .controls{padding:16px 16px 4px}
+  .monthnav{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px}
+  .monthnav button{width:38px;height:38px;border-radius:12px;background:var(--surface);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;color:var(--ink)}
+  .monthnav button:active{background:var(--brand-soft)}
+  .monthnav .mlabel{font-size:17px;font-weight:700;min-width:120px;text-align:center}
+  .monthnav .today{font-size:12px;color:var(--ink-soft);padding:6px 10px}
+
+  .segment{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .segment::-webkit-scrollbar{display:none}
+  .seg{
+    flex:0 0 auto;padding:9px 16px;border-radius:999px;background:var(--surface);
+    font-size:14px;font-weight:600;color:var(--ink-soft);box-shadow:var(--shadow);white-space:nowrap;
+  }
+  .seg.on{background:var(--brand);color:#fff}
+
+  /* summary */
+  .summary{margin:14px 16px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+  .sumtop{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}
+  .sumtop .lbl{font-size:13px;color:var(--ink-soft);font-weight:600}
+  .sumtop .big{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .sumtop .big small{font-size:15px;font-weight:600;color:var(--ink-soft);margin-left:2px}
+  .progbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-bottom:14px}
+  .progbar i{display:block;height:100%;background:var(--paid);border-radius:99px;transition:width .35s}
+  .sumstats{display:flex;gap:10px}
+  .stat{flex:1;text-align:center;padding:10px 6px;border-radius:12px;background:var(--bg)}
+  .stat .n{font-size:18px;font-weight:800;letter-spacing:-.02em}
+  .stat .t{font-size:11px;color:var(--ink-soft);margin-top:2px;font-weight:600}
+  .stat.unpaid .n{color:var(--unpaid)}
+  .stat.paid .n{color:var(--paid)}
+
+  /* filter chips */
+  .filters{display:flex;gap:8px;padding:0 16px 4px}
+  .chip{padding:7px 13px;border-radius:999px;background:var(--surface);font-size:13px;font-weight:600;color:var(--ink-soft);box-shadow:var(--shadow)}
+  .chip.on{background:var(--ink);color:#fff}
+
+  /* room cards */
+  .roomwrap{padding:8px 16px}
+  .bldhead{font-size:13px;font-weight:700;color:var(--ink-soft);padding:14px 4px 8px;display:flex;justify-content:space-between;align-items:center}
+  .bldhead .addr{font-weight:500;font-size:12px}
+  .card{
+    background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:14px 15px;margin-bottom:10px;display:flex;align-items:center;gap:13px;
+    position:relative;overflow:hidden;
+  }
+  .card .stripe{position:absolute;left:0;top:0;bottom:0;width:4px}
+  .card.s-paid .stripe{background:var(--paid)}
+  .card.s-unpaid .stripe{background:var(--unpaid)}
+  .card.s-vacant .stripe{background:var(--vacant)}
+  .roomno{
+    flex:0 0 56px;height:56px;border-radius:13px;background:var(--brand-soft);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .roomno .no{font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--brand)}
+  .roomno .ty{font-size:10px;color:var(--ink-soft);font-weight:600;margin-top:1px}
+  .cardmid{flex:1;min-width:0}
+  .cardmid .nm{font-size:16px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:6px}
+  .cardmid .nm .vacbadge{font-size:11px;font-weight:700;color:var(--vacant);background:var(--vacant-soft);padding:2px 7px;border-radius:6px}
+  .cardmid .rent{font-size:14px;color:var(--ink);font-weight:600;margin-top:3px}
+  .cardmid .rent .dep{color:var(--ink-soft);font-weight:500;font-size:12px;margin-left:6px}
+  .cardmid .meta{font-size:12px;color:var(--ink-soft);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+  .expire{font-weight:600}
+  .expire.soon{color:var(--warn);background:var(--warn-soft);padding:1px 6px;border-radius:5px}
+  .expire.over{color:var(--vacant)}
+  .note{color:var(--brand);background:var(--brand-soft);padding:1px 6px;border-radius:5px;font-weight:600}
+  .paybtn{
+    flex:0 0 auto;width:64px;height:56px;border-radius:13px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;font-weight:700;font-size:13px;gap:2px;transition:.12s;
+  }
+  .paybtn:active{transform:scale(.94)}
+  .paybtn.unpaid{background:var(--unpaid-soft);color:var(--unpaid)}
+  .paybtn.paid{background:var(--paid-soft);color:var(--paid)}
+  .paybtn svg{width:18px;height:18px}
+  .paybtn .pdt{font-size:9px;font-weight:600;opacity:.85}
+  .emptymsg{text-align:center;color:var(--ink-soft);font-size:14px;padding:48px 16px;line-height:1.6}
+
+  /* FAB */
+  .fab{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 20px);
+    background:var(--brand);color:#fff;padding:14px 22px;border-radius:999px;
+    font-size:15px;font-weight:700;box-shadow:0 6px 20px rgba(31,42,68,.35);
+    display:flex;align-items:center;gap:7px;z-index:30;
+  }
+  .fab:active{transform:translateX(-50%) scale(.96)}
+  .fab svg{width:20px;height:20px}
+
+  /* ---------- Modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(20,25,40,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}
+  .overlay.show{display:flex}
+  .sheet{
+    background:var(--surface);width:100%;max-width:560px;border-radius:22px 22px 0 0;
+    max-height:92vh;overflow-y:auto;padding:8px 20px calc(env(safe-area-inset-bottom) + 24px);
+    animation:slideup .25s ease;
+  }
+  @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .grab{width:40px;height:5px;border-radius:99px;background:var(--line);margin:8px auto 12px}
+  .sheet h2{font-size:19px;font-weight:800;margin:4px 0 18px;letter-spacing:-.02em}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
+  .field input,.field select{
+    width:100%;padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;
+    font-size:16px;background:var(--surface);color:var(--ink);
+  }
+  .field input:focus,.field select:focus{outline:none;border-color:var(--brand)}
+  .row2{display:flex;gap:12px}
+  .row2>.field{flex:1}
+  .seg-in{display:flex;gap:6px;flex-wrap:wrap}
+  .seg-in button{padding:9px 13px;border-radius:10px;background:var(--bg);font-size:14px;font-weight:600;color:var(--ink-soft)}
+  .seg-in button.on{background:var(--brand);color:#fff}
+  .btnrow{display:flex;gap:10px;margin-top:8px}
+  .btn{flex:1;padding:15px;border-radius:13px;font-size:16px;font-weight:700;text-align:center}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.ghost{background:var(--bg);color:var(--ink)}
+  .btn.danger{background:var(--unpaid-soft);color:var(--unpaid)}
+  .btn:active{opacity:.85}
+  .menuitem{display:flex;align-items:center;gap:14px;padding:16px 4px;font-size:16px;font-weight:600;border-bottom:1px solid var(--line)}
+  .menuitem:last-child{border-bottom:none}
+  .menuitem svg{width:22px;height:22px;color:var(--ink-soft)}
+  .menuitem .sub{font-size:12px;color:var(--ink-soft);font-weight:500;margin-top:2px}
+  .callbtn{display:inline-flex;align-items:center;gap:4px;color:var(--brand);font-weight:600;font-size:13px}
+  .toast{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:100px;background:var(--ink);color:#fff;
+    padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;z-index:200;opacity:0;transition:.25s;pointer-events:none;
+  }
+  .toast.show{opacity:1;bottom:120px}
+</style>
+</head>
+<body>
+
+<!-- ============ LOCK ============ -->
+<div id="lockScreen">
+  <h1 id="lockTitle">원룸 관리</h1>
+  <div id="lockSub">비밀번호를 입력하세요</div>
+  <div class="pinDots" id="pinDots"></div>
+  <div class="keypad" id="keypad"></div>
+  <div id="lockHint"></div>
+</div>
+
+<!-- ============ MAIN ============ -->
+<div id="mainScreen" hidden>
+  <header class="appbar">
+    <div class="title">원룸 관리</div>
+    <button class="iconbtn" id="menuBtn" aria-label="메뉴">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </button>
+  </header>
+
+  <div class="controls">
+    <div class="monthnav">
+      <button id="prevM" aria-label="이전 달"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="mlabel" id="mLabel">2026년 6월</div>
+      <button id="nextM" aria-label="다음 달"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+    <div class="segment" id="bldSeg"></div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="filters">
+    <button class="chip on" data-f="all" id="fAll">전체</button>
+    <button class="chip" data-f="unpaid" id="fUnpaid">미납만</button>
+    <button class="chip" data-f="expire" id="fExpire">만료임박</button>
+  </div>
+
+  <div class="roomwrap" id="roomList"></div>
+
+  <button class="fab" id="addRoomFab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    호실 추가
+  </button>
+</div>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   DB : 전체 상태를 IndexedDB 한 레코드에 저장 (단일 사용자 앱)
+   ============================================================ */
+const DB_NAME='oneroom-db', STORE='kv', KEY='state';
+let db=null, state=null;
+
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
+    r.onsuccess=()=>res(r.result);
+    r.onerror=()=>rej(r.error);
+  });
+}
+function dbGet(key){
+  return new Promise((res,rej)=>{
+    const t=db.transaction(STORE,'readonly').objectStore(STORE).get(key);
+    t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error);
+  });
+}
+function dbPut(key,val){
+  return new Promise((res,rej)=>{
+    const t=db.transaction(STORE,'readwrite').objectStore(STORE).put(val,key);
+    t.onsuccess=()=>res(); t.onerror=()=>rej(t.error);
+  });
+}
+async function saveState(){ try{ await dbPut(KEY, state); }catch(e){ console.error('save fail',e); toast('저장에 실패했어요'); } }
+
+/* ============================================================
+   Crypto : PIN 해시 (SHA-256 + salt)
+   ============================================================ */
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function randSalt(){ return [...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+
+/* ============================================================
+   Seed : 빈 상태로 시작 (데이터는 백업 불러오기로 주입)
+   ============================================================ */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function mkRoom(no,type,deposit,rent,start,end,tenant,note){
+  return { id:uid(), no, type, deposit, rent, tenant:tenant||'', phone:'',
+           startDate:start||'', endDate:end||'', note:note||'',
+           vacant: !tenant, payments:{} };
+}
+function seedState(){
+  // 배포 코드에는 개인정보를 넣지 않는다. 빈 상태로 시작하고
+  // 실제 데이터는 메뉴 → 백업 불러오기로 주입한다.
+  return { version:1, pin:null, buildings:[] };
+}
+
+/* ============================================================
+   상태 헬퍼
+   ============================================================ */
+const ROOM_TYPES=['원룸','투룸','미투','쓰룸','주인','기타'];
+let selMonth = ymOfDate(new Date());   // 'YYYY-MM'
+let selBld = 'all';                     // 빌라 id 또는 'all'
+let filter = 'all';                     // all | unpaid | expire
+
+function ymOfDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function fmtMonth(ym){ const [y,m]=ym.split('-'); return `${y}년 ${parseInt(m)}월`; }
+function won(n){ return (n||0).toLocaleString('ko-KR'); }
+function allRooms(){ return state.buildings.flatMap(b=>b.rooms.map(r=>({...r,_bld:b}))); }
+function findRoom(id){
+  for(const b of state.buildings){ const r=b.rooms.find(x=>x.id===id); if(r) return {room:r,bld:b}; }
+  return null;
+}
+function isPaid(room,ym){ return !!(room.payments && room.payments[ym] && room.payments[ym].paid); }
+
+/* 계약 만료 상태: {label, cls} */
+function expireInfo(room){
+  if(room.vacant||!room.endDate) return null;
+  const end=new Date(room.endDate+'T00:00:00');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const days=Math.round((end-today)/86400000);
+  if(days<0) return {label:`만료됨 ${room.endDate.replace(/-/g,'.')}`, cls:'over'};
+  if(days<=30) return {label:`만료 D-${days}`, cls:'soon'};
+  return {label:`~${room.endDate.replace(/-/g,'.')}`, cls:''};
+}
+
+/* ============================================================
+   렌더
+   ============================================================ */
+function render(){
+  renderBldSeg();
+  renderSummary();
+  renderList();
+  document.getElementById('mLabel').textContent=fmtMonth(selMonth);
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.f===filter));
+}
+
+function renderBldSeg(){
+  const seg=document.getElementById('bldSeg');
+  let html=`<button class="seg ${selBld==='all'?'on':''}" data-b="all">전체</button>`;
+  state.buildings.forEach(b=>{
+    html+=`<button class="seg ${selBld===b.id?'on':''}" data-b="${b.id}">${esc(b.name)}</button>`;
+  });
+  seg.innerHTML=html;
+  seg.querySelectorAll('.seg').forEach(el=>el.onclick=()=>{ selBld=el.dataset.b; filter='all'; render(); });
+}
+
+function visibleBuildings(){
+  return selBld==='all' ? state.buildings : state.buildings.filter(b=>b.id===selBld);
+}
+
+function renderSummary(){
+  const blds=visibleBuildings();
+  let occupied=0, total=0, due=0, got=0, unpaidCnt=0;
+  blds.forEach(b=>b.rooms.forEach(r=>{
+    total++;
+    if(r.vacant) return;
+    occupied++; due+=r.rent;
+    if(isPaid(r,selMonth)){ got+=r.rent; } else { unpaidCnt++; }
+  }));
+  const pct = due? Math.round(got/due*100) : 0;
+  document.getElementById('summary').innerHTML=`
+    <div class="sumtop">
+      <div>
+        <div class="lbl">${fmtMonth(selMonth)} 수금</div>
+        <div class="big tnum">${won(got)}<small>원</small></div>
+      </div>
+      <div style="text-align:right">
+        <div class="lbl">받을 월세</div>
+        <div class="big tnum" style="font-size:18px;color:var(--ink-soft)">${won(due)}<small>원</small></div>
+      </div>
+    </div>
+    <div class="progbar"><i style="width:${pct}%"></i></div>
+    <div class="sumstats">
+      <div class="stat"><div class="n">${total}</div><div class="t">전체 호실</div></div>
+      <div class="stat paid"><div class="n">${occupied-unpaidCnt}</div><div class="t">납부 완료</div></div>
+      <div class="stat unpaid"><div class="n">${unpaidCnt}</div><div class="t">미납</div></div>
+    </div>`;
+}
+
+function renderList(){
+  const wrap=document.getElementById('roomList');
+  if(state.buildings.length===0){
+    wrap.innerHTML=`<div class="emptymsg" style="padding:40px 20px">
+      <div style="font-size:40px;margin-bottom:12px">🏠</div>
+      <div style="font-weight:700;color:var(--ink);font-size:16px;margin-bottom:6px">시작해볼까요</div>
+      처음이라면 백업 파일을 불러와<br>기존 데이터를 한 번에 채울 수 있어요.
+      <div style="display:flex;gap:10px;margin-top:20px;justify-content:center">
+        <button class="btn primary" id="empImport" style="flex:0 0 auto;padding:13px 20px">백업 불러오기</button>
+        <button class="btn ghost" id="empBld" style="flex:0 0 auto;padding:13px 20px">건물 추가</button>
+      </div>
+      <input type="file" id="empFile" accept="application/json" hidden>
+    </div>`;
+    document.getElementById('empImport').onclick=()=>document.getElementById('empFile').click();
+    document.getElementById('empFile').onchange=importBackup;
+    document.getElementById('empBld').onclick=openBldEdit;
+    return;
+  }
+  const blds=visibleBuildings();
+  let html='';
+  let shown=0;
+  blds.forEach(b=>{
+    let rooms=b.rooms.slice();
+    // 정렬: 호실번호 오름차순
+    rooms.sort((x,y)=>parseInt(x.no)-parseInt(y.no));
+    if(filter==='unpaid') rooms=rooms.filter(r=>!r.vacant && !isPaid(r,selMonth));
+    if(filter==='expire') rooms=rooms.filter(r=>{ const e=expireInfo(r); return e&&(e.cls==='soon'||e.cls==='over'); });
+    if(rooms.length===0) return;
+    html+=`<div class="bldhead">${esc(b.name)} <span class="addr">${esc(b.address||'')}</span></div>`;
+    rooms.forEach(r=>{ shown++; html+=roomCard(r); });
+  });
+  if(shown===0){
+    const msg = filter==='unpaid' ? '미납인 호실이 없어요 👍'
+              : filter==='expire' ? '만료 임박이거나 만료된 계약이 없어요'
+              : '호실이 없어요. 아래 버튼으로 추가하세요';
+    html=`<div class="emptymsg">${msg}</div>`;
+  }
+  wrap.innerHTML=html;
+  wrap.querySelectorAll('[data-room]').forEach(el=>{
+    el.querySelector('.paybtn')?.addEventListener('click',ev=>{ ev.stopPropagation(); togglePay(el.dataset.room); });
+    el.addEventListener('click',()=>openRoomEdit(el.dataset.room));
+  });
+}
+
+function roomCard(r){
+  const paid=isPaid(r,selMonth);
+  const exp=expireInfo(r);
+  let stateCls = r.vacant ? 's-vacant' : (paid?'s-paid':'s-unpaid');
+  let payBtn;
+  if(r.vacant){
+    payBtn=`<div class="paybtn" style="background:var(--vacant-soft);color:var(--vacant)">공실</div>`;
+  }else if(paid){
+    const dt=r.payments[selMonth]?.date;
+    payBtn=`<div class="paybtn paid">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      완납${dt?`<span class="pdt">${dt.slice(5).replace('-','.')}</span>`:''}</div>`;
+  }else{
+    payBtn=`<div class="paybtn unpaid">미납<span class="pdt">탭하면 완납</span></div>`;
+  }
+  const meta=[];
+  if(exp) meta.push(`<span class="expire ${exp.cls}">${exp.label}</span>`);
+  if(r.note) meta.push(`<span class="note">${esc(r.note)}</span>`);
+  return `<div class="card ${stateCls}" data-room="${r.id}">
+    <div class="stripe"></div>
+    <div class="roomno"><div class="no">${esc(r.no)}</div><div class="ty">${esc(r.type)}</div></div>
+    <div class="cardmid">
+      <div class="nm">${r.vacant?`<span class="vacbadge">공실</span>`:esc(r.tenant)}</div>
+      ${r.vacant?'':`<div class="rent tnum">월 ${won(r.rent)}원 <span class="dep">보증 ${won(r.deposit)}</span></div>`}
+      ${meta.length?`<div class="meta">${meta.join('')}</div>`:''}
+    </div>
+    ${payBtn}
+  </div>`;
+}
+
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============================================================
+   동작
+   ============================================================ */
+async function togglePay(roomId){
+  const f=findRoom(roomId); if(!f||f.room.vacant) return;
+  const r=f.room;
+  if(!r.payments) r.payments={};
+  if(isPaid(r,selMonth)){
+    delete r.payments[selMonth];
+  }else{
+    r.payments[selMonth]={paid:true, date: ymOfDate(new Date())===selMonth ? new Date().toISOString().slice(0,10) : selMonth+'-01'};
+  }
+  await saveState();
+  render();
+}
+
+/* ---- 호실 편집/추가 시트 ---- */
+function openRoomEdit(roomId){
+  const isNew=!roomId;
+  if(isNew && state.buildings.length===0){ toast('먼저 건물을 추가하세요'); openBldEdit(); return; }
+  let bld, r;
+  if(isNew){ bld=selBld==='all'?state.buildings[0]:state.buildings.find(b=>b.id===selBld); r=mkRoom('','원룸',0,0,'','','',''); }
+  else { const f=findRoom(roomId); bld=f.bld; r=f.room; }
+  const bldOptions=state.buildings.map(b=>`<option value="${b.id}" ${b.id===bld.id?'selected':''}>${esc(b.name)}</option>`).join('');
+  openSheet(`
+    <h2>${isNew?'호실 추가':esc(bld.name)+' '+esc(r.no)+'호'}</h2>
+    <div class="field"><label>건물</label><select id="f_bld">${bldOptions}</select></div>
+    <div class="row2">
+      <div class="field"><label>호실</label><input id="f_no" value="${esc(r.no)}" placeholder="101" inputmode="numeric"></div>
+      <div class="field"><label>형태</label>
+        <div class="seg-in" id="f_type">${ROOM_TYPES.map(t=>`<button data-t="${t}" class="${t===r.type?'on':''}">${t}</button>`).join('')}</div>
+      </div>
+    </div>
+    <div class="field"><label>계약자</label><input id="f_tenant" value="${esc(r.tenant)}" placeholder="이름 (비우면 공실)"></div>
+    <div class="field"><label>전화번호</label><input id="f_phone" value="${esc(r.phone)}" placeholder="010-0000-0000" inputmode="tel">
+      ${r.phone?`<a class="callbtn" href="tel:${esc(r.phone)}" style="margin-top:8px">📞 전화 걸기</a>`:''}</div>
+    <div class="row2">
+      <div class="field"><label>월세 (원)</label><input id="f_rent" value="${r.rent||''}" placeholder="300000" inputmode="numeric"></div>
+      <div class="field"><label>보증금 (원)</label><input id="f_dep" value="${r.deposit||''}" placeholder="1000000" inputmode="numeric"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>계약 시작</label><input id="f_start" type="date" value="${r.startDate}"></div>
+      <div class="field"><label>계약 종료</label><input id="f_end" type="date" value="${r.endDate}"></div>
+    </div>
+    <div class="field"><label>비고</label><input id="f_note" value="${esc(r.note)}" placeholder="연장조정, 완납 등 메모"></div>
+    <div class="btnrow">
+      ${isNew?'':'<button class="btn danger" id="f_del">삭제</button>'}
+      <button class="btn primary" id="f_save">저장</button>
+    </div>
+  `);
+  let selType=r.type;
+  document.querySelectorAll('#f_type button').forEach(b=>b.onclick=()=>{
+    selType=b.dataset.t; document.querySelectorAll('#f_type button').forEach(x=>x.classList.toggle('on',x===b));
+  });
+  document.getElementById('f_save').onclick=async()=>{
+    const no=document.getElementById('f_no').value.trim();
+    if(!no){ toast('호실 번호를 입력하세요'); return; }
+    const targetBldId=document.getElementById('f_bld').value;
+    r.no=no; r.type=selType;
+    r.tenant=document.getElementById('f_tenant').value.trim();
+    r.phone=document.getElementById('f_phone').value.trim();
+    r.rent=parseInt(document.getElementById('f_rent').value.replace(/[^0-9]/g,''))||0;
+    r.deposit=parseInt(document.getElementById('f_dep').value.replace(/[^0-9]/g,''))||0;
+    r.startDate=document.getElementById('f_start').value;
+    r.endDate=document.getElementById('f_end').value;
+    r.note=document.getElementById('f_note').value.trim();
+    r.vacant=!r.tenant;
+    if(isNew){
+      state.buildings.find(b=>b.id===targetBldId).rooms.push(r);
+    }else if(targetBldId!==bld.id){
+      // 건물 이동
+      bld.rooms=bld.rooms.filter(x=>x.id!==r.id);
+      state.buildings.find(b=>b.id===targetBldId).rooms.push(r);
+    }
+    await saveState(); closeSheet(); render(); toast('저장됐어요');
+  };
+  if(!isNew) document.getElementById('f_del').onclick=async()=>{
+    if(!confirm(`${bld.name} ${r.no}호를 삭제할까요?`)) return;
+    bld.rooms=bld.rooms.filter(x=>x.id!==r.id);
+    await saveState(); closeSheet(); render(); toast('삭제됐어요');
+  };
+}
+
+/* ---- 메뉴 시트 (건물관리/백업) ---- */
+function openMenu(){
+  openSheet(`
+    <h2>메뉴</h2>
+    <div class="menuitem" id="m_addbld">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
+      <div><div>건물 추가 / 이름 변경</div><div class="sub">빌라를 새로 등록하거나 주소를 고쳐요</div></div>
+    </div>
+    <div class="menuitem" id="m_export">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      <div><div>백업 내보내기</div><div class="sub">전체 데이터를 파일로 저장 (꼭 가끔씩!)</div></div>
+    </div>
+    <div class="menuitem" id="m_import">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>
+      <div><div>백업 불러오기</div><div class="sub">저장한 파일로 복원 (현재 데이터는 덮어써져요)</div></div>
+    </div>
+    <div class="menuitem" id="m_pin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      <div><div>비밀번호 변경</div></div>
+    </div>
+    <input type="file" id="importFile" accept="application/json" hidden>
+  `);
+  document.getElementById('m_addbld').onclick=openBldEdit;
+  document.getElementById('m_export').onclick=exportBackup;
+  document.getElementById('m_import').onclick=()=>document.getElementById('importFile').click();
+  document.getElementById('m_pin').onclick=()=>{ closeSheet(); startChangePin(); };
+  document.getElementById('importFile').onchange=importBackup;
+}
+
+function openBldEdit(){
+  openSheet(`
+    <h2>건물 관리</h2>
+    <div id="bldList"></div>
+    <div class="field" style="margin-top:18px"><label>새 건물 이름</label><input id="nb_name" placeholder="예) 햇살빌"></div>
+    <div class="field"><label>주소 (선택)</label><input id="nb_addr" placeholder="거제시 ..."></div>
+    <div class="btnrow"><button class="btn primary" id="nb_add">건물 추가</button></div>
+  `);
+  const list=document.getElementById('bldList');
+  list.innerHTML=state.buildings.map(b=>`
+    <div class="field"><label>${esc(b.name)}</label>
+      <input data-bid="${b.id}" data-k="name" value="${esc(b.name)}" style="margin-bottom:8px">
+      <input data-bid="${b.id}" data-k="addr" value="${esc(b.address||'')}" placeholder="주소">
+    </div>`).join('');
+  list.querySelectorAll('input').forEach(inp=>inp.onchange=async()=>{
+    const b=state.buildings.find(x=>x.id===inp.dataset.bid);
+    if(inp.dataset.k==='name') b.name=inp.value.trim()||b.name; else b.address=inp.value.trim();
+    await saveState(); renderBldSeg();
+  });
+  document.getElementById('nb_add').onclick=async()=>{
+    const nm=document.getElementById('nb_name').value.trim();
+    if(!nm){ toast('건물 이름을 입력하세요'); return; }
+    state.buildings.push({id:uid(),name:nm,address:document.getElementById('nb_addr').value.trim(),rooms:[]});
+    await saveState(); closeSheet(); render(); toast('건물이 추가됐어요');
+  };
+}
+
+/* ---- 백업 ---- */
+function exportBackup(){
+  const data=JSON.stringify(state,null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`원룸관리_백업_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  closeSheet(); toast('백업 파일을 저장했어요');
+}
+function importBackup(ev){
+  const file=ev.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=async()=>{
+    try{
+      const obj=JSON.parse(reader.result);
+      if(!obj.buildings) throw new Error('형식이 올바르지 않아요');
+      if(!confirm('현재 데이터를 덮어쓰고 복원할까요?')) return;
+      const keepPin=state.pin; state=obj; state.pin=state.pin||keepPin;
+      await saveState(); closeSheet(); render(); toast('복원이 완료됐어요');
+    }catch(e){ toast('불러오기에 실패했어요'); }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   시트 공통
+   ============================================================ */
+const overlay=document.getElementById('overlay'), sheet=document.getElementById('sheet');
+function openSheet(html){ sheet.innerHTML=`<div class="grab"></div>`+html; overlay.classList.add('show'); }
+function closeSheet(){ overlay.classList.remove('show'); }
+overlay.onclick=e=>{ if(e.target===overlay) closeSheet(); };
+
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1800);
+}
+
+/* ============================================================
+   PIN 잠금 화면
+   ============================================================ */
+const lock=document.getElementById('lockScreen');
+let pinMode='unlock';   // unlock | set | confirm | change-old | change-new | change-confirm
+let pinBuf='', pinFirst='', pinErrCount=0;
+
+function buildKeypad(){
+  const kp=document.getElementById('keypad');
+  const keys=['1','2','3','4','5','6','7','8','9','','0','del'];
+  kp.innerHTML=keys.map(k=>{
+    if(k==='') return `<div></div>`;
+    if(k==='del') return `<div class="key fn" data-k="del">⌫</div>`;
+    return `<div class="key" data-k="${k}">${k}</div>`;
+  }).join('');
+  kp.querySelectorAll('.key').forEach(el=>el.onclick=()=>onKey(el.dataset.k));
+}
+function renderDots(){
+  const d=document.getElementById('pinDots');
+  d.innerHTML=[0,1,2,3].map(i=>`<div class="pinDot ${i<pinBuf.length?'on':''}"></div>`).join('');
+}
+function lockUI(title,sub){
+  document.getElementById('lockTitle').textContent=title;
+  document.getElementById('lockSub').textContent=sub;
+  document.getElementById('lockHint').textContent='';
+}
+function shakeDots(){
+  document.querySelectorAll('.pinDot').forEach(d=>d.classList.add('err'));
+  setTimeout(()=>{ pinBuf=''; renderDots(); document.querySelectorAll('.pinDot').forEach(d=>d.classList.remove('err')); },500);
+}
+
+async function onKey(k){
+  if(k==='del'){ pinBuf=pinBuf.slice(0,-1); renderDots(); return; }
+  if(pinBuf.length>=4) return;
+  pinBuf+=k; renderDots();
+  if(pinBuf.length===4) setTimeout(handlePin,120);
+}
+
+async function handlePin(){
+  const entered=pinBuf;
+  if(pinMode==='set'){ pinFirst=entered; pinBuf=''; renderDots(); pinMode='confirm'; lockUI('비밀번호 설정','한 번 더 입력하세요'); return; }
+  if(pinMode==='confirm'){
+    if(entered!==pinFirst){ pinBuf=''; pinFirst=''; pinMode='set'; lockUI('비밀번호 설정','숫자 4자리를 정하세요'); document.getElementById('lockHint').textContent='일치하지 않아요. 다시 정해주세요'; shakeDots(); return; }
+    const salt=randSalt(); state.pin={salt,hash:await sha256(entered+salt)}; await saveState(); enterApp(); return;
+  }
+  if(pinMode==='unlock'){
+    const ok=await sha256(entered+state.pin.salt)===state.pin.hash;
+    if(ok){ enterApp(); } else { pinErrCount++; shakeDots(); document.getElementById('lockHint').textContent='비밀번호가 틀렸어요'; }
+    return;
+  }
+  if(pinMode==='change-old'){
+    const ok=await sha256(entered+state.pin.salt)===state.pin.hash;
+    if(ok){ pinBuf=''; renderDots(); pinMode='change-new'; lockUI('새 비밀번호','새 4자리를 정하세요'); }
+    else{ shakeDots(); document.getElementById('lockHint').textContent='현재 비밀번호가 틀렸어요'; }
+    return;
+  }
+  if(pinMode==='change-new'){ pinFirst=entered; pinBuf=''; renderDots(); pinMode='change-confirm'; lockUI('새 비밀번호','한 번 더 입력하세요'); return; }
+  if(pinMode==='change-confirm'){
+    if(entered!==pinFirst){ pinBuf=''; pinMode='change-new'; lockUI('새 비밀번호','새 4자리를 정하세요'); document.getElementById('lockHint').textContent='일치하지 않아요'; shakeDots(); return; }
+    const salt=randSalt(); state.pin={salt,hash:await sha256(entered+salt)}; await saveState(); enterApp(); toast('비밀번호가 변경됐어요'); return;
+  }
+}
+
+function startChangePin(){
+  lock.hidden=false; document.getElementById('mainScreen').hidden=true;
+  pinBuf=''; pinFirst=''; pinMode='change-old'; renderDots(); lockUI('비밀번호 변경','현재 비밀번호를 입력하세요');
+}
+function enterApp(){
+  lock.hidden=true; document.getElementById('mainScreen').hidden=false;
+  pinBuf=''; render();
+}
+
+/* ============================================================
+   부팅
+   ============================================================ */
+async function boot(){
+  buildKeypad(); renderDots();
+  db=await openDB();
+  state=await dbGet(KEY);
+  if(!state){ state=seedState(); await saveState(); }
+  if(!state.pin){ pinMode='set'; lockUI('비밀번호 설정','앱을 보호할 숫자 4자리를 정하세요'); }
+  else { pinMode='unlock'; lockUI('원룸 관리','비밀번호를 입력하세요'); }
+}
+
+/* 메인 화면 버튼 바인딩 */
+document.getElementById('menuBtn').onclick=openMenu;
+document.getElementById('addRoomFab').onclick=()=>openRoomEdit(null);
+document.getElementById('prevM').onclick=()=>{ const[y,m]=selMonth.split('-').map(Number); const d=new Date(y,m-2,1); selMonth=ymOfDate(d); render(); };
+document.getElementById('nextM').onclick=()=>{ const[y,m]=selMonth.split('-').map(Number); const d=new Date(y,m,1); selMonth=ymOfDate(d); render(); };
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ filter=c.dataset.f; render(); });
+
+boot();
+</script>
+</body>
+</html>
