@@ -202,7 +202,8 @@
 <body>
 
 <!-- ============ LOCK (현재 비활성화 — 기본 숨김) ============ -->
-<div id="lockScreen" hidden>
+<!-- CSS #lockScreen{display:flex} 가 [hidden]를 이기므로 인라인 display:none 으로 확실히 숨김 -->
+<div id="lockScreen" hidden style="display:none">
   <h1 id="lockTitle">원룸 관리</h1>
   <div id="lockSub">비밀번호를 입력하세요</div>
   <div class="pinDots" id="pinDots"></div>
