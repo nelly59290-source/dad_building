@@ -201,8 +201,8 @@
 </head>
 <body>
 
-<!-- ============ LOCK ============ -->
-<div id="lockScreen">
+<!-- ============ LOCK (현재 비활성화 — 기본 숨김) ============ -->
+<div id="lockScreen" hidden>
   <h1 id="lockTitle">원룸 관리</h1>
   <div id="lockSub">비밀번호를 입력하세요</div>
   <div class="pinDots" id="pinDots"></div>
@@ -211,7 +211,7 @@
 </div>
 
 <!-- ============ MAIN ============ -->
-<div id="mainScreen" hidden>
+<div id="mainScreen">
   <header class="appbar">
     <div class="title">원룸 관리</div>
     <button class="iconbtn" id="menuBtn" aria-label="메뉴">
