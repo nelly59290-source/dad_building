@@ -613,16 +613,11 @@ function openMenu(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 9l5-5 5 5M12 4v12"/></svg>
       <div><div>백업 불러오기</div><div class="sub">저장한 파일로 복원 (현재 데이터는 덮어써져요)</div></div>
     </div>
-    <div class="menuitem" id="m_pin">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-      <div><div>비밀번호 변경</div></div>
-    </div>
     <input type="file" id="importFile" accept="application/json" hidden>
   `);
   document.getElementById('m_addbld').onclick=openBldEdit;
   document.getElementById('m_export').onclick=exportBackup;
   document.getElementById('m_import').onclick=()=>document.getElementById('importFile').click();
-  document.getElementById('m_pin').onclick=()=>{ closeSheet(); startChangePin(); };
   document.getElementById('importFile').onchange=importBackup;
 }
 
@@ -779,10 +774,10 @@ async function boot(){
   }
   state=await dbGet(KEY);
   if(!state){ state=seedState(); await saveState(); }
-  if(!state.pin){ pinMode='set'; lockUI('비밀번호 설정','앱을 보호할 숫자 4자리를 정하세요'); }
-  else { pinMode='unlock'; lockUI('원룸 관리','비밀번호를 입력하세요'); }
+  // PIN 잠금 없이 바로 앱으로 진입한다. (데이터는 100% 로컬 저장)
+  enterApp();
   if(memMode){
-    document.getElementById('lockSub').innerHTML+=`<br><span style="color:#ffd27a;font-size:12px">※ 미리보기 환경은 저장이 안 돼요. 새 탭/배포에서 쓰세요</span>`;
+    toast('미리보기 환경은 저장이 안 돼요. 배포 사이트에서 쓰세요');
   }
 }
 

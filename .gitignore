@@ -1,0 +1,15 @@
+# ⚠️ 세입자 개인정보가 담긴 백업/실데이터 파일 — 절대 커밋 금지
+아빠_실데이터_백업.json
+*_백업*.json
+*backup*.json
+실데이터*.json
+
+# 내부 작업 노트 (public repo이므로 공개 금지)
+CLAUDE.md
+gitignore.txt
+.omc/
+
+# 의존성/임시
+node_modules/
+.DS_Store
+*.log
