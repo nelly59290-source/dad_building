@@ -151,6 +151,40 @@
   .paybtn .pdt{font-size:9px;font-weight:600;opacity:.85}
   .emptymsg{text-align:center;color:var(--ink-soft);font-size:14px;padding:48px 16px;line-height:1.6}
 
+  /* tabs */
+  .tabs{display:flex;gap:8px;background:var(--brand);padding:0 14px 14px}
+  .tab{flex:1;padding:12px;border-radius:12px;font-size:15px;font-weight:700;color:#aeb6cc;background:rgba(255,255,255,.10);transition:.12s}
+  .tab.on{background:#fff;color:var(--brand);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  .tab:active{transform:scale(.98)}
+
+  /* tappable summary stats */
+  .stat{cursor:pointer;border:2px solid transparent;transition:.12s;width:100%;display:block}
+  .stat:active{transform:scale(.96)}
+  .stat.sel{border-color:var(--brand)}
+  .stat.paid.sel{border-color:var(--paid)}
+  .stat.unpaid.sel{border-color:var(--unpaid)}
+
+  /* arrears (미납 관리) table */
+  .arrsum{margin:16px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;text-align:center}
+  .arrsum .lbl{font-size:13px;color:var(--ink-soft);font-weight:600;margin-bottom:6px}
+  .arrsum .big{font-size:32px;font-weight:800;color:var(--unpaid);letter-spacing:-.03em;line-height:1}
+  .arrsum .big small{font-size:15px;font-weight:600;color:var(--ink-soft);margin-left:2px}
+  .arrsum .sub{font-size:13px;color:var(--ink-soft);font-weight:600;margin-top:8px}
+  .atable{margin:0 16px 24px;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .ahead,.arow{display:grid;grid-template-columns:1fr 70px 96px;align-items:center;gap:8px;padding:13px 14px}
+  .ahead{background:var(--bg);font-size:11px;font-weight:700;color:var(--ink-soft)}
+  .ahead .c{text-align:center}
+  .ahead .r{text-align:right}
+  .arow{border-top:1px solid var(--line)}
+  .arow:active{background:var(--brand-soft)}
+  .arow .who .rm{font-size:15px;font-weight:800;letter-spacing:-.01em}
+  .arow .who .tn{font-size:12px;color:var(--ink-soft);margin-top:2px}
+  .amon{justify-self:center;min-width:54px;text-align:center;font-size:14px;font-weight:800;padding:5px 6px;border-radius:8px}
+  .amon.m1{color:var(--warn);background:var(--warn-soft)}
+  .amon.m2{color:var(--unpaid);background:var(--unpaid-soft)}
+  .amon.m3{color:#fff;background:var(--unpaid)}
+  .aamt{text-align:right;font-size:14px;font-weight:700;color:var(--ink)}
+
   /* FAB */
   .fab{
     position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 20px);
@@ -230,6 +264,12 @@
     </button>
   </header>
 
+  <div class="tabs">
+    <button class="tab on" data-v="home">월세 현황</button>
+    <button class="tab" data-v="arrears">미납 관리</button>
+  </div>
+
+  <div id="homeView">
   <div class="controls">
     <div class="monthnav">
       <button id="prevM" aria-label="이전 달"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -242,12 +282,16 @@
   <div class="summary" id="summary"></div>
 
   <div class="filters">
-    <button class="chip on" data-f="all" id="fAll">전체</button>
-    <button class="chip" data-f="unpaid" id="fUnpaid">미납만</button>
-    <button class="chip" data-f="expire" id="fExpire">만료임박</button>
+    <button class="chip on" data-f="all">전체</button>
+    <button class="chip" data-f="unpaid">미납만</button>
+    <button class="chip" data-f="paid">완납만</button>
+    <button class="chip" data-f="expire">만료임박</button>
   </div>
 
   <div class="roomwrap" id="roomList"></div>
+  </div><!-- /homeView -->
+
+  <div id="arrearsView" style="display:none"></div>
 
   <button class="fab" id="addRoomFab">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -372,7 +416,8 @@ function seedState(){
 const ROOM_TYPES=['원룸','투룸','미투','쓰룸','주인','기타'];
 let selMonth = ymOfDate(new Date());   // 'YYYY-MM'
 let selBld = 'all';                     // 빌라 id 또는 'all'
-let filter = 'all';                     // all | unpaid | expire
+let filter = 'all';                     // all | unpaid | paid | expire
+let view = 'home';                      // home | arrears
 
 function ymOfDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function fmtMonth(ym){ const [y,m]=ym.split('-'); return `${y}년 ${parseInt(m)}월`; }
@@ -419,11 +464,21 @@ function unpaidStreak(room, ym){
    렌더
    ============================================================ */
 function render(){
+  if(view==='arrears'){ renderArrears(); return; }
   renderBldSeg();
   renderSummary();
   renderList();
   document.getElementById('mLabel').textContent=fmtMonth(selMonth);
   document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.f===filter));
+}
+
+function switchView(v){
+  view=v;
+  document.getElementById('homeView').style.display = v==='home' ? '' : 'none';
+  document.getElementById('arrearsView').style.display = v==='arrears' ? '' : 'none';
+  document.getElementById('addRoomFab').style.display = v==='home' ? '' : 'none';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
+  render();
 }
 
 function renderBldSeg(){
@@ -463,10 +518,11 @@ function renderSummary(){
     </div>
     <div class="progbar"><i style="width:${pct}%"></i></div>
     <div class="sumstats">
-      <div class="stat"><div class="n">${total}</div><div class="t">전체 호실</div></div>
-      <div class="stat paid"><div class="n">${occupied-unpaidCnt}</div><div class="t">납부 완료</div></div>
-      <div class="stat unpaid"><div class="n">${unpaidCnt}</div><div class="t">미납</div></div>
+      <button class="stat ${filter==='all'?'sel':''}" data-f="all"><div class="n">${total}</div><div class="t">전체 호실</div></button>
+      <button class="stat paid ${filter==='paid'?'sel':''}" data-f="paid"><div class="n">${occupied-unpaidCnt}</div><div class="t">납부 완료</div></button>
+      <button class="stat unpaid ${filter==='unpaid'?'sel':''}" data-f="unpaid"><div class="n">${unpaidCnt}</div><div class="t">미납</div></button>
     </div>`;
+  document.querySelectorAll('#summary .stat').forEach(b=>b.onclick=()=>{ filter=b.dataset.f; render(); });
 }
 
 function renderList(){
@@ -495,6 +551,7 @@ function renderList(){
     // 정렬: 호실번호 오름차순
     rooms.sort((x,y)=>parseInt(x.no)-parseInt(y.no));
     if(filter==='unpaid') rooms=rooms.filter(r=>!r.vacant && !isPaid(r,selMonth));
+    if(filter==='paid') rooms=rooms.filter(r=>!r.vacant && isPaid(r,selMonth));
     if(filter==='expire') rooms=rooms.filter(r=>{ const e=expireInfo(r); return e&&(e.cls==='soon'||e.cls==='over'); });
     if(rooms.length===0) return;
     html+=`<div class="bldhead">${esc(b.name)} <span class="addr">${esc(b.address||'')}</span></div>`;
@@ -502,6 +559,7 @@ function renderList(){
   });
   if(shown===0){
     const msg = filter==='unpaid' ? '미납인 호실이 없어요 👍'
+              : filter==='paid' ? '완납된 호실이 없어요'
               : filter==='expire' ? '만료 임박이거나 만료된 계약이 없어요'
               : '호실이 없어요. 아래 버튼으로 추가하세요';
     html=`<div class="emptymsg">${msg}</div>`;
@@ -511,6 +569,46 @@ function renderList(){
     el.querySelector('.paybtn')?.addEventListener('click',ev=>{ ev.stopPropagation(); togglePay(el.dataset.room); });
     el.addEventListener('click',()=>openRoomEdit(el.dataset.room));
   });
+}
+
+/* 미납 관리 탭: 현재 달 기준 밀린 호실을 엑셀처럼 한눈에 (밀린 개월수 내림차순) */
+function renderArrears(){
+  const wrap=document.getElementById('arrearsView');
+  const nowYm=ymOfDate(new Date());
+  const rows=[];
+  state.buildings.forEach(b=>b.rooms.forEach(r=>{
+    if(r.vacant) return;
+    const st=unpaidStreak(r,nowYm);
+    if(st>=1) rows.push({bld:b, room:r, st, amt:r.rent*st});
+  }));
+  rows.sort((a,b)=> b.st-a.st || b.amt-a.amt);
+  if(rows.length===0){
+    wrap.innerHTML=`<div class="emptymsg" style="padding:60px 20px">
+      <div style="font-size:42px;margin-bottom:12px">🎉</div>
+      <div style="font-weight:700;color:var(--ink);font-size:16px;margin-bottom:6px">밀린 월세가 없어요</div>
+      모든 세입자가 ${fmtMonth(nowYm)}까지<br>납부를 마쳤어요.</div>`;
+    return;
+  }
+  const totalAmt=rows.reduce((s,x)=>s+x.amt,0);
+  const rowsHtml=rows.map(x=>{
+    const cls = x.st>=3?'m3' : x.st>=2?'m2' : 'm1';
+    return `<div class="arow" data-room="${x.room.id}">
+      <div class="who"><div class="rm">${esc(x.bld.name)} ${esc(x.room.no)}호</div><div class="tn">${esc(x.room.tenant)}</div></div>
+      <div class="amon ${cls}">${x.st}개월</div>
+      <div class="aamt tnum">${won(x.amt)}원</div>
+    </div>`;
+  }).join('');
+  wrap.innerHTML=`
+    <div class="arrsum">
+      <div class="lbl">${fmtMonth(nowYm)} 기준 · 밀린 월세 합계</div>
+      <div class="big tnum">${won(totalAmt)}<small>원</small></div>
+      <div class="sub">미납 ${rows.length}호실</div>
+    </div>
+    <div class="atable">
+      <div class="ahead"><div>건물 · 호실</div><div class="c">밀린 개월</div><div class="r">밀린 금액</div></div>
+      ${rowsHtml}
+    </div>`;
+  wrap.querySelectorAll('.arow').forEach(el=>el.onclick=()=>openRoomEdit(el.dataset.room));
 }
 
 function roomCard(r){
@@ -835,6 +933,7 @@ document.getElementById('addRoomFab').onclick=()=>openRoomEdit(null);
 document.getElementById('prevM').onclick=()=>{ const[y,m]=selMonth.split('-').map(Number); const d=new Date(y,m-2,1); selMonth=ymOfDate(d); render(); };
 document.getElementById('nextM').onclick=()=>{ const[y,m]=selMonth.split('-').map(Number); const d=new Date(y,m,1); selMonth=ymOfDate(d); render(); };
 document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ filter=c.dataset.f; render(); });
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchView(t.dataset.v));
 
 boot();
 </script>
