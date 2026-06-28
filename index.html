@@ -137,6 +137,9 @@
   .expire.soon{color:var(--warn);background:var(--warn-soft);padding:1px 6px;border-radius:5px}
   .expire.over{color:var(--vacant)}
   .note{color:var(--brand);background:var(--brand-soft);padding:1px 6px;border-radius:5px;font-weight:600}
+  .arrears{margin-top:5px;display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:800;color:var(--unpaid);background:var(--unpaid-soft);padding:4px 10px;border-radius:8px;letter-spacing:-.01em}
+  .arrears.one{color:var(--warn);background:var(--warn-soft)}
+  .arrears svg{width:14px;height:14px}
   .paybtn{
     flex:0 0 auto;width:64px;height:56px;border-radius:13px;display:flex;flex-direction:column;
     align-items:center;justify-content:center;font-weight:700;font-size:13px;gap:2px;transition:.12s;
@@ -162,12 +165,19 @@
   .overlay{position:fixed;inset:0;background:rgba(20,25,40,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}
   .overlay.show{display:flex}
   .sheet{
+    position:relative;
     background:var(--surface);width:100%;max-width:560px;border-radius:22px 22px 0 0;
-    max-height:92vh;overflow-y:auto;padding:8px 20px calc(env(safe-area-inset-bottom) + 24px);
+    max-height:92vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    padding:0 20px calc(env(safe-area-inset-bottom) + 24px);
     animation:slideup .25s ease;
   }
   @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
-  .grab{width:40px;height:5px;border-radius:99px;background:var(--line);margin:8px auto 12px}
+  .sheethead{position:sticky;top:0;z-index:5;background:var(--surface);height:48px;margin:0 -20px 4px}
+  .grab{position:absolute;left:50%;top:9px;transform:translateX(-50%);width:40px;height:5px;border-radius:99px;background:var(--line)}
+  .sheetback{position:absolute;left:8px;top:7px;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+  .sheetback svg{width:24px;height:24px}
+  .sheetback:active{background:var(--bg)}
+  body.noscroll{overflow:hidden}
   .sheet h2{font-size:19px;font-weight:800;margin:4px 0 18px;letter-spacing:-.02em}
   .field{margin-bottom:14px}
   .field label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:6px}
@@ -385,6 +395,26 @@ function expireInfo(room){
   return {label:`~${room.endDate.replace(/-/g,'.')}`, cls:''};
 }
 
+/* 누적 미납 개월수: selMonth부터 과거로 연속 미납을 센다.
+   하한선 = 계약 시작월(없으면 기록된 가장 이른 납부월). 둘 다 없으면 해당 월만(1). */
+function unpaidStreak(room, ym){
+  if(room.vacant || isPaid(room,ym)) return 0;
+  let lb = room.startDate ? room.startDate.slice(0,7) : null;
+  if(!lb){
+    const keys=Object.keys(room.payments||{});
+    if(keys.length) lb=keys.sort()[0];
+  }
+  let count=0, [y,m]=ym.split('-').map(Number);
+  for(let i=0;i<120;i++){
+    const cur=y+'-'+String(m).padStart(2,'0');
+    if(isPaid(room,cur)) break;
+    count++;
+    if(!lb || cur<=lb) break;   // 기준점 없음 → 해당 월만 / 계약 시작월 도달 시 종료
+    m--; if(m===0){ m=12; y--; }
+  }
+  return count;
+}
+
 /* ============================================================
    렌더
    ============================================================ */
@@ -501,12 +531,20 @@ function roomCard(r){
   const meta=[];
   if(exp) meta.push(`<span class="expire ${exp.cls}">${exp.label}</span>`);
   if(r.note) meta.push(`<span class="note">${esc(r.note)}</span>`);
+  let arrears='';
+  if(!r.vacant && !paid){
+    const st=unpaidStreak(r,selMonth);
+    const warnIcon=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>`;
+    if(st>=2) arrears=`<div class="arrears">${warnIcon}${st}개월 밀림 · ${won(r.rent*st)}원</div>`;
+    else      arrears=`<div class="arrears one">${warnIcon}이번 달 미납</div>`;
+  }
   return `<div class="card ${stateCls}" data-room="${r.id}">
     <div class="stripe"></div>
     <div class="roomno"><div class="no">${esc(r.no)}</div><div class="ty">${esc(r.type)}</div></div>
     <div class="cardmid">
       <div class="nm">${r.vacant?`<span class="vacbadge">공실</span>`:esc(r.tenant)}</div>
       ${r.vacant?'':`<div class="rent tnum">월 ${won(r.rent)}원 <span class="dep">보증 ${won(r.deposit)}</span></div>`}
+      ${arrears}
       ${meta.length?`<div class="meta">${meta.join('')}</div>`:''}
     </div>
     ${payBtn}
@@ -678,8 +716,17 @@ function importBackup(ev){
    시트 공통
    ============================================================ */
 const overlay=document.getElementById('overlay'), sheet=document.getElementById('sheet');
-function openSheet(html){ sheet.innerHTML=`<div class="grab"></div>`+html; overlay.classList.add('show'); }
-function closeSheet(){ overlay.classList.remove('show'); }
+function openSheet(html){
+  sheet.scrollTop=0;
+  sheet.innerHTML=`<div class="sheethead">
+    <button class="sheetback" id="sheetBack" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="grab"></div>
+  </div>`+html;
+  overlay.classList.add('show');
+  document.body.classList.add('noscroll');
+  document.getElementById('sheetBack').onclick=closeSheet;
+}
+function closeSheet(){ overlay.classList.remove('show'); document.body.classList.remove('noscroll'); }
 overlay.onclick=e=>{ if(e.target===overlay) closeSheet(); };
 
 let toastTimer;
